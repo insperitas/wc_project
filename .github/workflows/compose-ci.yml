@@ -1,0 +1,55 @@
+name: CI - docker-compose tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  compose-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+
+      - name: Build and start services
+        run: |
+          docker compose up -d --build
+
+      - name: Wait for backend health
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8000/health 2>/dev/null | grep -q '"status"'; then
+              echo "backend healthy"; break
+            fi
+            echo "waiting for backend... ($i)"; sleep 2
+          done
+
+      - name: Run auth tests
+        env:
+          BASE_URL: http://127.0.0.1:8000
+        run: |
+          set -euo pipefail
+          # register (ignore non-zero if user already exists)
+          curl -s -X POST "$BASE_URL/auth/register" \
+            -H "Content-Type: application/json" \
+            -d '{"email":"ci@example.com","password":"TestPass123"}' || true
+
+          # login
+          TOKEN=$(curl -s -X POST "$BASE_URL/auth/login" \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            -d 'username=ci@example.com&password=TestPass123' | jq -r .access_token)
+
+          echo "token=$TOKEN"
+          if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
+            echo "Login failed or token missing"; exit 1
+          fi
+
+      - name: Tear down
+        if: always()
+        run: |
+          docker compose down -v
