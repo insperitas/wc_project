@@ -2,9 +2,10 @@
   "name": "wc_project Codespace",
   "dockerComposeFile": ["../docker-compose.yml"],
   "service": "backend",
-  "workspaceFolder": "/workspace",
-  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind",
+  "workspaceFolder": "/workspaces/wc_project",
   "forwardPorts": [8000, 5173],
+  "runServices": ["db","backend"],
+  "shutdownAction": "stopCompose",
   "postCreateCommand": "pip install -r backend/requirements.txt || true && (cd frontend/customer && npm ci) || true",
   "settings": {
     "terminal.integrated.shell.linux": "/bin/bash"
